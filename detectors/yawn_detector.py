@@ -1,6 +1,5 @@
 """Mouth Aspect Ratio (MAR) based yawning detection."""
 
-import numpy as np
 from scipy.spatial import distance as dist
 
 import config

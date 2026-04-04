@@ -1,6 +1,7 @@
 """HUD overlay rendering for the driver safety system."""
 
 import cv2
+import numpy as np
 
 import config
 
@@ -9,11 +10,11 @@ def draw_hud(frame, ear, mar, yaw, pitch, fps, active_alerts):
     """Draw the status dashboard on the frame."""
     h, w = frame.shape[:2]
 
-    # Semi-transparent background panel (right side)
     panel_w = 220
-    overlay = frame.copy()
-    cv2.rectangle(overlay, (w - panel_w, 0), (w, 180), (0, 0, 0), -1)
-    cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
+    panel_h = 180
+    panel_x = w - panel_w
+    roi = frame[0:panel_h, panel_x:w]
+    cv2.addWeighted(np.zeros_like(roi), 0.6, roi, 0.4, 0, roi)
 
     x = w - panel_w + 10
     y = 25

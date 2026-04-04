@@ -10,6 +10,9 @@ class HeadPoseDetector:
     def __init__(self):
         self.counter = 0
         self.model_points = np.array(config.MODEL_POINTS_3D, dtype=np.float64)
+        self._cached_shape = None
+        self._camera_matrix = None
+        self._dist_coeffs = np.zeros((4, 1))
 
     def detect(self, landmarks, frame_shape):
         """Estimate head pose and detect distraction.
@@ -19,25 +22,23 @@ class HeadPoseDetector:
         """
         h, w = frame_shape[:2]
 
-        # 2D image points from landmarks
         image_points = np.array(
             [landmarks[i][:2] for i in config.HEAD_POSE_LANDMARKS],
             dtype=np.float64,
         )
 
-        # Camera intrinsics (approximate)
-        focal_length = w
-        center = (w / 2, h / 2)
-        camera_matrix = np.array(
-            [[focal_length, 0, center[0]],
-             [0, focal_length, center[1]],
-             [0, 0, 1]],
-            dtype=np.float64,
-        )
-        dist_coeffs = np.zeros((4, 1))
+        if (h, w) != self._cached_shape:
+            focal_length = w
+            self._camera_matrix = np.array(
+                [[focal_length, 0, w / 2],
+                 [0, focal_length, h / 2],
+                 [0, 0, 1]],
+                dtype=np.float64,
+            )
+            self._cached_shape = (h, w)
 
         success, rotation_vec, translation_vec = cv2.solvePnP(
-            self.model_points, image_points, camera_matrix, dist_coeffs,
+            self.model_points, image_points, self._camera_matrix, self._dist_coeffs,
             flags=cv2.SOLVEPNP_ITERATIVE,
         )
 
@@ -45,12 +46,9 @@ class HeadPoseDetector:
             self.counter = 0
             return 0.0, 0.0, 0.0, False
 
-        # Convert rotation vector to Euler angles
         rotation_mat, _ = cv2.Rodrigues(rotation_vec)
         proj_matrix = np.hstack((rotation_mat, translation_vec))
-        _, _, _, _, _, _, euler_angles = cv2.decomposeProjectionMatrix(
-            np.vstack((proj_matrix, [0, 0, 0, 1]))[:3]
-        )
+        _, _, _, _, _, _, euler_angles = cv2.decomposeProjectionMatrix(proj_matrix)
 
         pitch = euler_angles[0, 0]
         yaw = euler_angles[1, 0]

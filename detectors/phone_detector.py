@@ -1,7 +1,6 @@
 """Phone detection using YOLOv8 in a background thread."""
 
 import threading
-import time
 from collections import deque
 
 from ultralytics import YOLO
@@ -17,6 +16,7 @@ class PhoneDetector:
         self._running = False
         self._thread = None
         self._latest_frame = None
+        self._frame_event = threading.Event()
         self._history = deque(maxlen=config.PHONE_DETECTION_WINDOW)
 
     def start(self):
@@ -27,14 +27,18 @@ class PhoneDetector:
     def update_frame(self, frame):
         with self._lock:
             self._latest_frame = frame.copy()
+        self._frame_event.set()
 
     def _run(self):
         while self._running:
+            if not self._frame_event.wait(timeout=0.1):
+                continue
+            self._frame_event.clear()
+
             with self._lock:
                 frame = self._latest_frame
 
             if frame is None:
-                time.sleep(0.01)
                 continue
 
             results = self.model(
@@ -45,11 +49,9 @@ class PhoneDetector:
             )
 
             found = len(results[0].boxes) > 0
-            self._history.append(found)
-
-            detected = sum(self._history) >= config.PHONE_MIN_DETECTIONS
             with self._lock:
-                self._detected = detected
+                self._history.append(found)
+                self._detected = sum(self._history) >= config.PHONE_MIN_DETECTIONS
 
     @property
     def is_phone_detected(self):
@@ -58,5 +60,6 @@ class PhoneDetector:
 
     def stop(self):
         self._running = False
+        self._frame_event.set()
         if self._thread:
             self._thread.join(timeout=2)

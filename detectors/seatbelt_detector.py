@@ -1,12 +1,12 @@
-"""Seatbelt detection using YOLOv8 in a background thread.
+"""Seatbelt detection using YOLOv5 pretrained model in a background thread.
 
-Uses a pretrained seatbelt detection model. If custom weights are not available,
-falls back to a heuristic-based approach using edge detection.
+Uses pretrained weights from kaggle.com/datasets/sachinmlwala/seatbelt3.
+Classes: 0 = "No Seatbelt", 1 = "Seatbelt Worn".
+Falls back to heuristic edge detection if weights are not available.
 """
 
 import os
 import threading
-import time
 
 import cv2
 import numpy as np
@@ -15,14 +15,19 @@ import config
 
 CUSTOM_WEIGHTS = os.path.join(os.path.dirname(__file__), "..", "models", "seatbelt.pt")
 
+# Class IDs from sachinmlwala/seatbelt3 YOLOv5 model
+CLASS_NO_SEATBELT = 0
+CLASS_SEATBELT = 1
+
 
 class SeatbeltDetector:
     def __init__(self):
-        self._is_wearing = True  # Default to True (assume wearing until proven otherwise)
+        self._is_wearing = True
         self._lock = threading.Lock()
         self._running = False
         self._thread = None
         self._latest_frame = None
+        self._frame_event = threading.Event()
         self._use_yolo = os.path.exists(CUSTOM_WEIGHTS)
 
         if self._use_yolo:
@@ -37,14 +42,18 @@ class SeatbeltDetector:
     def update_frame(self, frame):
         with self._lock:
             self._latest_frame = frame.copy()
+        self._frame_event.set()
 
     def _run(self):
         while self._running:
+            if not self._frame_event.wait(timeout=0.1):
+                continue
+            self._frame_event.clear()
+
             with self._lock:
                 frame = self._latest_frame
 
             if frame is None:
-                time.sleep(0.05)
                 continue
 
             if self._use_yolo:
@@ -55,13 +64,25 @@ class SeatbeltDetector:
             with self._lock:
                 self._is_wearing = wearing
 
-            time.sleep(0.1)  # Don't need to check every frame
-
     def _detect_yolo(self, frame):
-        """Detect seatbelt using custom YOLO model."""
+        """Detect seatbelt using pretrained YOLOv5 model.
+
+        Model classes: 0 = No Seatbelt, 1 = Seatbelt Worn.
+        Returns True if seatbelt is detected (class 1) or no detections at all.
+        Returns False only if "No Seatbelt" (class 0) is detected.
+        """
         results = self.model(frame, conf=config.SEATBELT_CONFIDENCE, verbose=False)
-        # Assumes model has classes: 0=seatbelt (present)
-        return len(results[0].boxes) > 0
+        boxes = results[0].boxes
+
+        if len(boxes) == 0:
+            return True  # No detection, assume wearing
+
+        for box in boxes:
+            cls_id = int(box.cls[0])
+            if cls_id == CLASS_NO_SEATBELT:
+                return False
+
+        return True
 
     def _detect_heuristic(self, frame):
         """Fallback: detect diagonal strap using edge detection.
@@ -104,5 +125,6 @@ class SeatbeltDetector:
 
     def stop(self):
         self._running = False
+        self._frame_event.set()
         if self._thread:
             self._thread.join(timeout=2)

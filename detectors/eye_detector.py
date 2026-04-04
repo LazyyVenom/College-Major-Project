@@ -1,6 +1,5 @@
 """Eye Aspect Ratio (EAR) based drowsiness detection."""
 
-import numpy as np
 from scipy.spatial import distance as dist
 
 import config

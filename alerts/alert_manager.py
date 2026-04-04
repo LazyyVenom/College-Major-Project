@@ -18,22 +18,18 @@ def _generate_beep(filename, frequency=800, duration_ms=500, sample_rate=44100):
     if os.path.exists(filepath):
         return filepath
 
-    import struct
     import wave
 
     n_samples = int(sample_rate * duration_ms / 1000)
-    samples = []
-    for i in range(n_samples):
-        t = i / sample_rate
-        value = int(32767 * 0.5 * np.sin(2 * np.pi * frequency * t))
-        samples.append(struct.pack("<h", value))
+    t = np.linspace(0, duration_ms / 1000, n_samples, endpoint=False)
+    samples = (32767 * 0.5 * np.sin(2 * np.pi * frequency * t)).astype(np.int16)
 
     os.makedirs(SOUNDS_DIR, exist_ok=True)
     with wave.open(filepath, "w") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
         wf.setframerate(sample_rate)
-        wf.writeframes(b"".join(samples))
+        wf.writeframes(samples.tobytes())
 
     return filepath
 
@@ -61,6 +57,10 @@ class AlertManager:
             self.sounds[name] = pygame.mixer.Sound(filepath)
 
         self.last_alert_time = {name: 0.0 for name in config.ALERTS}
+        self.text_sizes = {
+            name: cv2.getTextSize(cfg["message"], cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+            for name, cfg in config.ALERTS.items()
+        }
 
     def trigger(self, alert_name):
         """Trigger an alert if not in cooldown. Returns True if alert fired."""
@@ -104,8 +104,7 @@ class AlertManager:
             msg = cfg["message"]
             color = cfg["color"]
 
-            # Background rectangle for readability
-            text_size = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+            text_size = self.text_sizes[alert_name]
             cv2.rectangle(
                 frame,
                 (5, y_offset - 20),
