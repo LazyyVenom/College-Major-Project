@@ -11,6 +11,10 @@ __pycache__/
 
 # Models (large binary files)
 models/*.pt
+yolov8n.pt
+
+# Generated alert sounds
+alerts/sounds/*.wav
 
 # OS files
 .DS_Store

@@ -5,7 +5,7 @@ Model: YOLOv5 trained on seatbelt dataset
 Classes: 0 = "No Seatbelt", 1 = "Seatbelt Worn"
 
 Prerequisites:
-    pip install kaggle
+    uv add kaggle
     Then set up your Kaggle API credentials:
     - Go to kaggle.com -> Account -> Create New Token
     - Place kaggle.json in ~/.kaggle/kaggle.json
@@ -31,7 +31,7 @@ def main():
 
     # Check kaggle CLI
     if not shutil.which("kaggle"):
-        print("Kaggle CLI not found. Install it with: pip install kaggle")
+        print("Kaggle CLI not found. Install it with: uv add kaggle")
         print("Then set up credentials: https://www.kaggle.com/docs/api")
         sys.exit(1)
 
