@@ -1,0 +1,16 @@
+# Virtual environment
+.venv/
+__pycache__/
+
+# Videos
+/input_videos/
+*.mp4
+*.mov
+*.MOV
+*.avi
+
+# Models (large binary files)
+models/*.pt
+
+# OS files
+.DS_Store
