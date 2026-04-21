@@ -10,6 +10,7 @@ from detectors.yawn_detector import YawnDetector
 from detectors.head_pose_detector import HeadPoseDetector
 from detectors.phone_detector import PhoneDetector
 from detectors.seatbelt_detector import SeatbeltDetector
+from detectors.drunk_detector import DrunkDetector
 from alerts.alert_manager import AlertManager
 from utils.drawing import draw_hud
 
@@ -29,6 +30,7 @@ def main():
     head_det = HeadPoseDetector()
     phone_det = PhoneDetector()
     seatbelt_det = SeatbeltDetector()
+    drunk_det = DrunkDetector()
     alert_mgr = AlertManager()
 
     phone_det.start()
@@ -56,12 +58,13 @@ def main():
         landmarks = face_mesh.get_landmarks(rgb)
 
         active_alerts = []
-        ear, mar, yaw, pitch = 0.0, 0.0, 0.0, 0.0
+        ear, mar, yaw, pitch, drunk_score = 0.0, 0.0, 0.0, 0.0, 0.0
 
         if landmarks is not None:
             ear, is_drowsy = eye_det.detect(landmarks)
             mar, is_yawning = yawn_det.detect(landmarks)
             yaw, pitch, _, is_distracted = head_det.detect(landmarks, frame.shape)
+            drunk_score, is_drunk = drunk_det.detect(landmarks, ear, yaw, pitch)
 
             if is_drowsy:
                 active_alerts.append("drowsiness")
@@ -69,6 +72,8 @@ def main():
                 active_alerts.append("yawning")
             if is_distracted:
                 active_alerts.append("distraction")
+            if is_drunk:
+                active_alerts.append("drunk")
 
         # YOLO detectors (threaded)
         phone_det.update_frame(frame)
@@ -84,7 +89,7 @@ def main():
             alert_mgr.trigger(name)
 
         # Draw HUD and alerts
-        draw_hud(frame, ear, mar, yaw, pitch, fps, active_alerts)
+        draw_hud(frame, ear, mar, yaw, pitch, fps, active_alerts, drunk_score)
         alert_mgr.draw_warnings(frame, active_alerts)
 
         cv2.imshow("Driver Safety System", frame)

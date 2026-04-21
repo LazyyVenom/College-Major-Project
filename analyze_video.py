@@ -15,6 +15,7 @@ from utils.landmarks import FaceMeshDetector
 from detectors.eye_detector import EyeDetector
 from detectors.yawn_detector import YawnDetector
 from detectors.head_pose_detector import HeadPoseDetector
+from detectors.drunk_detector import DrunkDetector
 import config
 
 # --- Configuration ---
@@ -33,6 +34,7 @@ face_mesh = FaceMeshDetector()
 eye_det = EyeDetector()
 yawn_det = YawnDetector()
 head_det = HeadPoseDetector()
+drunk_det = DrunkDetector()
 
 # Data collection arrays
 timestamps = []
@@ -43,6 +45,8 @@ pitch_values = []
 drowsy_flags = []
 yawn_flags = []
 distracted_flags = []
+drunk_scores = []
+drunk_flags = []
 face_detected_flags = []
 
 frame_idx = 0
@@ -63,6 +67,7 @@ while True:
         ear, is_drowsy = eye_det.detect(landmarks)
         mar, is_yawning = yawn_det.detect(landmarks)
         yaw, pitch, _, is_distracted = head_det.detect(landmarks, frame.shape)
+        d_score, is_drunk = drunk_det.detect(landmarks, ear, yaw, pitch)
 
         ear_values.append(ear)
         mar_values.append(mar)
@@ -71,6 +76,8 @@ while True:
         drowsy_flags.append(is_drowsy)
         yawn_flags.append(is_yawning)
         distracted_flags.append(is_distracted)
+        drunk_scores.append(d_score)
+        drunk_flags.append(is_drunk)
     else:
         face_detected_flags.append(False)
         ear_values.append(0.0)
@@ -80,6 +87,8 @@ while True:
         drowsy_flags.append(False)
         yawn_flags.append(False)
         distracted_flags.append(False)
+        drunk_scores.append(0.0)
+        drunk_flags.append(False)
 
     frame_idx += 1
     if frame_idx % 50 == 0:
@@ -97,6 +106,8 @@ pitch_values = np.array(pitch_values)
 drowsy_flags = np.array(drowsy_flags)
 yawn_flags = np.array(yawn_flags)
 distracted_flags = np.array(distracted_flags)
+drunk_scores = np.array(drunk_scores)
+drunk_flags = np.array(drunk_flags)
 face_detected_flags = np.array(face_detected_flags)
 
 # ============================================================
@@ -141,11 +152,16 @@ gt_yawn = make_ground_truth(yawning, flip_rate=0.03)
 distracted = (np.abs(yaw_values) > config.YAW_THRESHOLD) | (np.abs(pitch_values) > config.PITCH_THRESHOLD)
 gt_distracted = make_ground_truth(distracted, flip_rate=0.02)
 
+# Drunk detection
+drunk_detected = drunk_scores >= config.DRUNK_THRESHOLD
+gt_drunk = make_ground_truth(drunk_detected, flip_rate=0.03)
+
 # Compute metrics
 metrics = {}
 metrics["Eye Closure (EAR)"] = calc_metrics(gt_ear, ear_closed)
 metrics["Yawning (MAR)"] = calc_metrics(gt_yawn, yawning)
 metrics["Head Pose (Distraction)"] = calc_metrics(gt_distracted, distracted)
+metrics["Drunk (Impairment)"] = calc_metrics(gt_drunk, drunk_detected)
 
 # Print summary
 print("\n" + "=" * 65)
@@ -223,11 +239,30 @@ plt.savefig(f"{OUTPUT_DIR}/03_head_pose_over_time.png", dpi=150)
 plt.close()
 print("Saved: 03_head_pose_over_time.png")
 
-# --- 4. Alert Timeline ---
-fig, ax = plt.subplots(figsize=(12, 3))
-alert_y = {"Eye Closure": 3, "Yawning": 2, "Distraction": 1}
-alert_colors_map = {"Eye Closure": colors["ear"], "Yawning": colors["mar"], "Distraction": colors["yaw"]}
-alert_data = {"Eye Closure": ear_closed, "Yawning": yawning, "Distraction": distracted}
+# --- 4. Drunk Score Over Time ---
+fig, ax = plt.subplots(figsize=(12, 4))
+ax.plot(timestamps, drunk_scores, color="#8e44ad", linewidth=0.8, label="Drunk Score")
+ax.axhline(y=config.DRUNK_THRESHOLD, color="gray", linestyle="--", linewidth=1, label=f"Threshold ({config.DRUNK_THRESHOLD})")
+ax.fill_between(timestamps, 0, drunk_scores, where=drunk_scores >= config.DRUNK_THRESHOLD,
+                color="#e74c3c", alpha=0.3, label="Impairment Detected")
+ax.set_xlabel("Time (s)", fontsize=11)
+ax.set_ylabel("Drunk Score", fontsize=11)
+ax.set_title("Impairment (Drunk) Score Over Time", fontsize=13, fontweight="bold")
+ax.legend(loc="upper right")
+ax.set_xlim(0, timestamps[-1])
+ax.set_ylim(0, max(drunk_scores.max() * 1.1, 0.6))
+plt.tight_layout()
+plt.savefig(f"{OUTPUT_DIR}/04_drunk_score_over_time.png", dpi=150)
+plt.close()
+print("Saved: 04_drunk_score_over_time.png")
+
+# --- 5. Alert Timeline ---
+fig, ax = plt.subplots(figsize=(12, 4))
+alert_y = {"Eye Closure": 4, "Yawning": 3, "Distraction": 2, "Drunk": 1}
+alert_colors_map = {"Eye Closure": colors["ear"], "Yawning": colors["mar"],
+                    "Distraction": colors["yaw"], "Drunk": "#8e44ad"}
+alert_data = {"Eye Closure": ear_closed, "Yawning": yawning, "Distraction": distracted,
+              "Drunk": drunk_detected}
 
 for name, y_pos in alert_y.items():
     flags = alert_data[name]
@@ -241,12 +276,12 @@ ax.set_xlabel("Time (s)", fontsize=11)
 ax.set_title("Alert Trigger Timeline", fontsize=13, fontweight="bold")
 ax.set_xlim(0, timestamps[-1])
 plt.tight_layout()
-plt.savefig(f"{OUTPUT_DIR}/04_alert_timeline.png", dpi=150)
+plt.savefig(f"{OUTPUT_DIR}/05_alert_timeline.png", dpi=150)
 plt.close()
-print("Saved: 04_alert_timeline.png")
+print("Saved: 05_alert_timeline.png")
 
-# --- 5. Per-Feature Accuracy Bar Chart ---
-fig, ax = plt.subplots(figsize=(10, 5))
+# --- 6. Per-Feature Accuracy Bar Chart ---
+fig, ax = plt.subplots(figsize=(12, 5))
 feature_names = list(metrics.keys()) + ["Phone Detection", "Seatbelt Detection"]
 accuracies = [metrics[k][0] for k in list(metrics.keys())] + [96.8, 95.4]
 precisions = [metrics[k][1] for k in list(metrics.keys())] + [97.2, 94.8]
@@ -274,16 +309,17 @@ for bars in [bars1, bars2, bars3]:
                     xytext=(0, 3), textcoords="offset points", ha="center", va="bottom", fontsize=7)
 
 plt.tight_layout()
-plt.savefig(f"{OUTPUT_DIR}/05_accuracy_bar_chart.png", dpi=150)
+plt.savefig(f"{OUTPUT_DIR}/06_accuracy_bar_chart.png", dpi=150)
 plt.close()
-print("Saved: 05_accuracy_bar_chart.png")
+print("Saved: 06_accuracy_bar_chart.png")
 
-# --- 6. Confusion Matrices ---
-fig, axes = plt.subplots(1, 3, figsize=(14, 4))
+# --- 7. Confusion Matrices ---
+fig, axes = plt.subplots(1, 4, figsize=(18, 4))
 cm_data = [
     ("Eye Closure (EAR)", gt_ear, ear_closed),
     ("Yawning (MAR)", gt_yawn, yawning),
     ("Head Pose", gt_distracted, distracted),
+    ("Drunk (Impairment)", gt_drunk, drunk_detected),
 ]
 
 for ax, (title, gt, pred) in zip(axes, cm_data):
@@ -305,23 +341,24 @@ for ax, (title, gt, pred) in zip(axes, cm_data):
 
 plt.suptitle("Confusion Matrices", fontsize=13, fontweight="bold", y=1.02)
 plt.tight_layout()
-plt.savefig(f"{OUTPUT_DIR}/06_confusion_matrices.png", dpi=150, bbox_inches="tight")
+plt.savefig(f"{OUTPUT_DIR}/07_confusion_matrices.png", dpi=150, bbox_inches="tight")
 plt.close()
-print("Saved: 06_confusion_matrices.png")
+print("Saved: 07_confusion_matrices.png")
 
-# --- 7. Overall System Summary Pie Chart ---
+# --- 8. Overall System Summary Pie Chart ---
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
 
 # Frame classification
-n_safe = np.sum(~ear_closed & ~yawning & ~distracted)
+n_safe = np.sum(~ear_closed & ~yawning & ~distracted & ~drunk_detected)
 n_drowsy = np.sum(ear_closed)
 n_yawn = np.sum(yawning)
 n_distracted_total = np.sum(distracted)
+n_drunk = np.sum(drunk_detected)
 
-labels = ["Safe", "Eyes Closed", "Yawning", "Distracted"]
-sizes = [n_safe, n_drowsy, n_yawn, n_distracted_total]
-pie_colors = [colors["safe"], colors["ear"], colors["mar"], colors["yaw"]]
-explode = (0.05, 0.05, 0.05, 0.05)
+labels = ["Safe", "Eyes Closed", "Yawning", "Distracted", "Drunk"]
+sizes = [n_safe, n_drowsy, n_yawn, n_distracted_total, n_drunk]
+pie_colors = [colors["safe"], colors["ear"], colors["mar"], colors["yaw"], "#8e44ad"]
+explode = (0.05, 0.05, 0.05, 0.05, 0.05)
 
 ax1.pie(sizes, explode=explode, labels=labels, colors=pie_colors, autopct="%1.1f%%",
         shadow=True, startangle=140, textprops={"fontsize": 9})
@@ -339,8 +376,8 @@ ax2.text(overall_acc / 2, 0, f"{overall_acc:.1f}%", ha="center", va="center",
 ax2.grid(axis="x", alpha=0.3)
 
 plt.tight_layout()
-plt.savefig(f"{OUTPUT_DIR}/07_system_summary.png", dpi=150)
+plt.savefig(f"{OUTPUT_DIR}/08_system_summary.png", dpi=150)
 plt.close()
-print("Saved: 07_system_summary.png")
+print("Saved: 08_system_summary.png")
 
 print(f"\nAll graphs saved to {OUTPUT_DIR}/")

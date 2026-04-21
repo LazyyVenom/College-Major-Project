@@ -45,6 +45,31 @@ PHONE_MIN_DETECTIONS = 3     # min detections in window to trigger
 # --- Seatbelt Detection ---
 SEATBELT_CONFIDENCE = 0.5
 
+# --- Drunk / Impairment Detection ---
+DRUNK_THRESHOLD = 0.45           # combined score threshold (0-1)
+DRUNK_CONSECUTIVE_FRAMES = 30    # ~1s at 30fps before alerting
+DRUNK_WINDOW_FRAMES = 150        # sliding window (~5s at 30fps)
+DRUNK_MIN_FRAMES = 60            # minimum frames before scoring
+
+# Landmark indices for asymmetry calculation
+DRUNK_LEFT_MOUTH = 61
+DRUNK_RIGHT_MOUTH = 291
+DRUNK_NOSE_TIP = 1
+
+# Per-signal thresholds
+DRUNK_EAR_STD_THRESHOLD = 0.06       # EAR standard deviation
+DRUNK_SWAY_THRESHOLD = 12.0          # head sway std (degrees)
+DRUNK_ASYMMETRY_THRESHOLD = 0.15     # facial asymmetry
+DRUNK_BLINK_STD_THRESHOLD = 8.0      # blink duration variance (frames)
+DRUNK_CLOSURE_RATIO_THRESHOLD = 0.3  # fraction of frames with eyes closed
+
+# Signal weights (sum to 1.0)
+DRUNK_WEIGHT_EAR_VAR = 0.20
+DRUNK_WEIGHT_SWAY = 0.30
+DRUNK_WEIGHT_ASYMMETRY = 0.20
+DRUNK_WEIGHT_BLINK = 0.15
+DRUNK_WEIGHT_CLOSURE = 0.15
+
 # --- Alert Configuration ---
 ALERTS = {
     "drowsiness": {
@@ -81,6 +106,13 @@ ALERTS = {
         "message": "PLEASE WEAR YOUR SEATBELT!",
         "cooldown": 15.0,
         "priority": 1,
+    },
+    "drunk": {
+        "sound": "alerts/sounds/drunk_alert.wav",
+        "color": (0, 50, 200),       # Dark orange (BGR)
+        "message": "IMPAIRMENT DETECTED - PULL OVER!",
+        "cooldown": 10.0,
+        "priority": 6,
     },
 }
 

@@ -6,12 +6,12 @@ import numpy as np
 import config
 
 
-def draw_hud(frame, ear, mar, yaw, pitch, fps, active_alerts):
+def draw_hud(frame, ear, mar, yaw, pitch, fps, active_alerts, drunk_score=0.0):
     """Draw the status dashboard on the frame."""
     h, w = frame.shape[:2]
 
     panel_w = 220
-    panel_h = 180
+    panel_h = 205
     panel_x = w - panel_w
     roi = frame[0:panel_h, panel_x:w]
     cv2.addWeighted(np.zeros_like(roi), 0.6, roi, 0.4, 0, roi)
@@ -45,6 +45,11 @@ def draw_hud(frame, ear, mar, yaw, pitch, fps, active_alerts):
 
     pitch_color = red if abs(pitch) > config.PITCH_THRESHOLD else green
     cv2.putText(frame, f"Pitch: {pitch:.1f}", (x, y), font, scale, pitch_color, 1)
+    y += 25
+
+    # Drunk Score
+    drunk_color = red if drunk_score >= config.DRUNK_THRESHOLD else green
+    cv2.putText(frame, f"Drunk: {drunk_score:.2f}", (x, y), font, scale, drunk_color, 1)
     y += 25
 
     # Status
