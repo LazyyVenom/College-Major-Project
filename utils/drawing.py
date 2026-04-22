@@ -28,16 +28,6 @@ def draw_hud(frame, ear, mar, yaw, pitch, fps, active_alerts, drunk_score=0.0):
     cv2.putText(frame, f"FPS: {fps:.1f}", (x, y), font, scale, white, 1)
     y += 25
 
-    # EAR
-    ear_color = red if ear < config.EAR_THRESHOLD else green
-    cv2.putText(frame, f"EAR: {ear:.2f}", (x, y), font, scale, ear_color, 1)
-    y += 25
-
-    # MAR
-    mar_color = red if mar > config.YAWN_THRESHOLD else green
-    cv2.putText(frame, f"MAR: {mar:.2f}", (x, y), font, scale, mar_color, 1)
-    y += 25
-
     # Head Pose
     yaw_color = red if abs(yaw) > config.YAW_THRESHOLD else green
     cv2.putText(frame, f"Yaw: {yaw:.1f}", (x, y), font, scale, yaw_color, 1)
