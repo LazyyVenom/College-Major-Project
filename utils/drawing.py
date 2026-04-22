@@ -11,7 +11,7 @@ def draw_hud(frame, ear, mar, yaw, pitch, fps, active_alerts, drunk_score=0.0):
     h, w = frame.shape[:2]
 
     panel_w = 220
-    panel_h = 205
+    panel_h = 155
     panel_x = w - panel_w
     roi = frame[0:panel_h, panel_x:w]
     cv2.addWeighted(np.zeros_like(roi), 0.6, roi, 0.4, 0, roi)
