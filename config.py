@@ -19,12 +19,12 @@ MOUTH_LEFT = 78
 MOUTH_RIGHT = 308
 
 # --- Head Pose (Distraction) ---
-YAW_THRESHOLD = 30      # degrees
-PITCH_THRESHOLD = 25     # degrees
-HEAD_POSE_CONSECUTIVE_FRAMES = 15
+YAW_THRESHOLD = 40      # degrees
+PITCH_THRESHOLD = 40     # degrees
+HEAD_POSE_CONSECUTIVE_FRAMES = 30
 
 # 6 key landmark indices for solvePnP
-HEAD_POSE_LANDMARKS = [1, 199, 33, 263, 61, 291]
+HEAD_POSE_LANDMARKS = [1, 152, 33, 263, 61, 291]
 
 # 3D model points (generic face model)
 MODEL_POINTS_3D = [

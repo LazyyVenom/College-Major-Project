@@ -54,6 +54,18 @@ class HeadPoseDetector:
         yaw = euler_angles[1, 0]
         roll = euler_angles[2, 0]
 
+        # Normalize angles — decomposeProjectionMatrix can return values
+        # near ±180° instead of near 0° when looking straight ahead.
+        if pitch > 90:
+            pitch = 180 - pitch
+        elif pitch < -90:
+            pitch = -180 - pitch
+
+        if yaw > 90:
+            yaw = 180 - yaw
+        elif yaw < -90:
+            yaw = -180 - yaw
+
         if abs(yaw) > config.YAW_THRESHOLD or abs(pitch) > config.PITCH_THRESHOLD:
             self.counter += 1
         else:
