@@ -9,6 +9,7 @@ from detectors.eye_detector import EyeDetector
 from detectors.yawn_detector import YawnDetector
 from detectors.head_pose_detector import HeadPoseDetector
 from detectors.phone_detector import PhoneDetector
+from detectors.seatbelt_detector import SeatbeltDetector
 from detectors.drunk_detector import DrunkDetector
 from alerts.alert_manager import AlertManager
 from utils.drawing import draw_hud
@@ -28,10 +29,13 @@ def main():
     yawn_det = YawnDetector()
     head_det = HeadPoseDetector()
     phone_det = PhoneDetector()
+    seatbelt_det = SeatbeltDetector() if config.SEATBELT_ENABLED else None
     drunk_det = DrunkDetector()
     alert_mgr = AlertManager()
 
     phone_det.start()
+    if seatbelt_det:
+        seatbelt_det.start()
 
     prev_time = time.time()
     fps = 0
@@ -77,6 +81,11 @@ def main():
         if phone_det.is_phone_detected:
             active_alerts.append("phone")
 
+        if seatbelt_det:
+            seatbelt_det.update_frame(frame)
+            if not seatbelt_det.is_wearing:
+                active_alerts.append("seatbelt")
+
         # Fire alerts
         for name in active_alerts:
             alert_mgr.trigger(name)
@@ -91,6 +100,8 @@ def main():
 
     # Cleanup
     phone_det.stop()
+    if seatbelt_det:
+        seatbelt_det.stop()
     face_mesh.close()
     cap.release()
     cv2.destroyAllWindows()
