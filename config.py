@@ -46,10 +46,10 @@ PHONE_MIN_DETECTIONS = 3     # min detections in window to trigger
 SEATBELT_CONFIDENCE = 0.5
 
 # --- Drunk / Impairment Detection ---
-DRUNK_THRESHOLD = 0.45           # combined score threshold (0-1)
-DRUNK_CONSECUTIVE_FRAMES = 30    # ~1s at 30fps before alerting
-DRUNK_WINDOW_FRAMES = 150        # sliding window (~5s at 30fps)
-DRUNK_MIN_FRAMES = 60            # minimum frames before scoring
+DRUNK_THRESHOLD = 0.65           # combined score threshold (0-1)
+DRUNK_CONSECUTIVE_FRAMES = 45    # ~1.5s at 30fps before alerting
+DRUNK_WINDOW_FRAMES = 180        # sliding window (~6s at 30fps)
+DRUNK_MIN_FRAMES = 90            # minimum frames before scoring
 
 # Landmark indices for asymmetry calculation
 DRUNK_LEFT_MOUTH = 61
@@ -57,11 +57,11 @@ DRUNK_RIGHT_MOUTH = 291
 DRUNK_NOSE_TIP = 1
 
 # Per-signal thresholds
-DRUNK_EYE_STD_THRESHOLD = 0.06       # eye score standard deviation
-DRUNK_SWAY_THRESHOLD = 12.0          # head sway std (degrees)
-DRUNK_ASYMMETRY_THRESHOLD = 0.15     # facial asymmetry
-DRUNK_BLINK_STD_THRESHOLD = 8.0      # blink duration variance (frames)
-DRUNK_CLOSURE_RATIO_THRESHOLD = 0.3  # fraction of frames with eyes closed
+DRUNK_EYE_STD_THRESHOLD = 0.09       # eye score standard deviation
+DRUNK_SWAY_THRESHOLD = 18.0          # head sway std (degrees)
+DRUNK_ASYMMETRY_THRESHOLD = 0.22     # facial asymmetry
+DRUNK_BLINK_STD_THRESHOLD = 12.0     # blink duration variance (frames)
+DRUNK_CLOSURE_RATIO_THRESHOLD = 0.4  # fraction of frames with eyes closed
 
 # Signal weights (sum to 1.0)
 DRUNK_WEIGHT_EYE_VAR = 0.20
