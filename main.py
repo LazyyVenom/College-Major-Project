@@ -51,17 +51,17 @@ def main():
         fps = 1.0 / (curr_time - prev_time) if (curr_time - prev_time) > 0 else 0
         prev_time = curr_time
 
-        # MediaPipe landmarks (single call, shared by 3 detectors)
+        # MediaPipe landmarks (single call, shared by detectors)
         landmarks = face_mesh.get_landmarks(rgb)
 
         active_alerts = []
-        ear, mar, yaw, pitch, drunk_score = 0.0, 0.0, 0.0, 0.0, 0.0
+        eye_score, yawn_score, yaw, pitch, drunk_score = 0.0, 0.0, 0.0, 0.0, 0.0
 
         if landmarks is not None:
-            ear, is_drowsy = eye_det.detect(landmarks)
-            mar, is_yawning = yawn_det.detect(landmarks)
+            eye_score, is_drowsy = eye_det.detect(landmarks)
+            yawn_score, is_yawning = yawn_det.detect(landmarks)
             yaw, pitch, _, is_distracted = head_det.detect(landmarks, frame.shape)
-            drunk_score, is_drunk = drunk_det.detect(landmarks, ear, yaw, pitch)
+            drunk_score, is_drunk = drunk_det.detect(landmarks, eye_score, yaw, pitch)
 
             if is_drowsy:
                 active_alerts.append("drowsiness")
@@ -82,7 +82,7 @@ def main():
             alert_mgr.trigger(name)
 
         # Draw HUD and alerts
-        draw_hud(frame, ear, mar, yaw, pitch, fps, active_alerts, drunk_score)
+        draw_hud(frame, yaw, pitch, fps, active_alerts, drunk_score)
         alert_mgr.draw_warnings(frame, active_alerts)
 
         cv2.imshow("Driver Safety System", frame)

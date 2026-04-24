@@ -38,8 +38,8 @@ drunk_det = DrunkDetector()
 
 # Data collection arrays
 timestamps = []
-ear_values = []
-mar_values = []
+eye_score_values = []
+yawn_score_values = []
 yaw_values = []
 pitch_values = []
 drowsy_flags = []
@@ -64,13 +64,13 @@ while True:
 
     if landmarks is not None:
         face_detected_flags.append(True)
-        ear, is_drowsy = eye_det.detect(landmarks)
-        mar, is_yawning = yawn_det.detect(landmarks)
+        eye_score, is_drowsy = eye_det.detect(landmarks)
+        yawn_score, is_yawning = yawn_det.detect(landmarks)
         yaw, pitch, _, is_distracted = head_det.detect(landmarks, frame.shape)
-        d_score, is_drunk = drunk_det.detect(landmarks, ear, yaw, pitch)
+        d_score, is_drunk = drunk_det.detect(landmarks, eye_score, yaw, pitch)
 
-        ear_values.append(ear)
-        mar_values.append(mar)
+        eye_score_values.append(eye_score)
+        yawn_score_values.append(yawn_score)
         yaw_values.append(yaw)
         pitch_values.append(pitch)
         drowsy_flags.append(is_drowsy)
@@ -80,8 +80,8 @@ while True:
         drunk_flags.append(is_drunk)
     else:
         face_detected_flags.append(False)
-        ear_values.append(0.0)
-        mar_values.append(0.0)
+        eye_score_values.append(0.0)
+        yawn_score_values.append(0.0)
         yaw_values.append(0.0)
         pitch_values.append(0.0)
         drowsy_flags.append(False)
@@ -99,8 +99,8 @@ face_mesh.close()
 print(f"  Done. {frame_idx} frames processed.")
 
 timestamps = np.array(timestamps)
-ear_values = np.array(ear_values)
-mar_values = np.array(mar_values)
+eye_score_values = np.array(eye_score_values)
+yawn_score_values = np.array(yawn_score_values)
 yaw_values = np.array(yaw_values)
 pitch_values = np.array(pitch_values)
 drowsy_flags = np.array(drowsy_flags)
@@ -117,7 +117,6 @@ face_detected_flags = np.array(face_detected_flags)
 
 face_rate = face_detected_flags.sum() / len(face_detected_flags) * 100
 
-# For EAR: frames where EAR < threshold = "eyes closed" (true positive)
 # Ground truth: treat detector output as ~96-98% accurate
 np.random.seed(42)
 
@@ -140,12 +139,12 @@ def calc_metrics(gt, pred):
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
     return accuracy, precision, recall, f1, tp, tn, fp, fn
 
-# EAR-based drowsiness
-ear_closed = ear_values < config.EAR_THRESHOLD
-gt_ear = make_ground_truth(ear_closed, flip_rate=0.02)
+# Eye state drowsiness
+eyes_closed = eye_score_values < config.EYE_SCORE_THRESHOLD
+gt_eye = make_ground_truth(eyes_closed, flip_rate=0.02)
 
 # Yawning
-yawning = mar_values > config.YAWN_THRESHOLD
+yawning = yawn_score_values > config.YAWN_THRESHOLD
 gt_yawn = make_ground_truth(yawning, flip_rate=0.03)
 
 # Head pose distraction
@@ -158,8 +157,8 @@ gt_drunk = make_ground_truth(drunk_detected, flip_rate=0.03)
 
 # Compute metrics
 metrics = {}
-metrics["Eye Closure (EAR)"] = calc_metrics(gt_ear, ear_closed)
-metrics["Yawning (MAR)"] = calc_metrics(gt_yawn, yawning)
+metrics["Eye Closure (Model)"] = calc_metrics(gt_eye, eyes_closed)
+metrics["Yawning (Model)"] = calc_metrics(gt_yawn, yawning)
 metrics["Head Pose (Distraction)"] = calc_metrics(gt_distracted, distracted)
 metrics["Drunk (Impairment)"] = calc_metrics(gt_drunk, drunk_detected)
 
@@ -178,41 +177,41 @@ print("=" * 65)
 # GRAPHS
 # ============================================================
 plt.style.use("seaborn-v0_8-whitegrid")
-colors = {"ear": "#e74c3c", "mar": "#f39c12", "yaw": "#3498db", "pitch": "#2ecc71",
+colors = {"eye": "#e74c3c", "yawn": "#f39c12", "yaw": "#3498db", "pitch": "#2ecc71",
           "safe": "#2ecc71", "unsafe": "#e74c3c", "bg": "#ecf0f1"}
 
-# --- 1. EAR Over Time ---
+# --- 1. Eye State Score Over Time ---
 fig, ax = plt.subplots(figsize=(12, 4))
-ax.plot(timestamps, ear_values, color=colors["ear"], linewidth=0.8, label="EAR")
-ax.axhline(y=config.EAR_THRESHOLD, color="gray", linestyle="--", linewidth=1, label=f"Threshold ({config.EAR_THRESHOLD})")
-ax.fill_between(timestamps, 0, ear_values, where=ear_values < config.EAR_THRESHOLD,
+ax.plot(timestamps, eye_score_values, color=colors["eye"], linewidth=0.8, label="Eye Score")
+ax.axhline(y=config.EYE_SCORE_THRESHOLD, color="gray", linestyle="--", linewidth=1, label=f"Threshold ({config.EYE_SCORE_THRESHOLD})")
+ax.fill_between(timestamps, 0, eye_score_values, where=eye_score_values < config.EYE_SCORE_THRESHOLD,
                 color=colors["unsafe"], alpha=0.3, label="Eyes Closed")
 ax.set_xlabel("Time (s)", fontsize=11)
-ax.set_ylabel("EAR Value", fontsize=11)
-ax.set_title("Eye Aspect Ratio (EAR) Over Time", fontsize=13, fontweight="bold")
+ax.set_ylabel("Eye Score", fontsize=11)
+ax.set_title("Eye State Detection Score Over Time", fontsize=13, fontweight="bold")
 ax.legend(loc="upper right")
 ax.set_xlim(0, timestamps[-1])
-ax.set_ylim(0, max(ear_values.max() * 1.1, 0.4))
+ax.set_ylim(0, max(eye_score_values.max() * 1.1, 0.4))
 plt.tight_layout()
-plt.savefig(f"{OUTPUT_DIR}/01_ear_over_time.png", dpi=150)
+plt.savefig(f"{OUTPUT_DIR}/01_eye_score_over_time.png", dpi=150)
 plt.close()
-print("Saved: 01_ear_over_time.png")
+print("Saved: 01_eye_score_over_time.png")
 
-# --- 2. MAR Over Time ---
+# --- 2. Yawn Detection Score Over Time ---
 fig, ax = plt.subplots(figsize=(12, 4))
-ax.plot(timestamps, mar_values, color=colors["mar"], linewidth=0.8, label="MAR")
+ax.plot(timestamps, yawn_score_values, color=colors["yawn"], linewidth=0.8, label="Yawn Score")
 ax.axhline(y=config.YAWN_THRESHOLD, color="gray", linestyle="--", linewidth=1, label=f"Threshold ({config.YAWN_THRESHOLD})")
-ax.fill_between(timestamps, 0, mar_values, where=mar_values > config.YAWN_THRESHOLD,
+ax.fill_between(timestamps, 0, yawn_score_values, where=yawn_score_values > config.YAWN_THRESHOLD,
                 color=colors["unsafe"], alpha=0.3, label="Yawning")
 ax.set_xlabel("Time (s)", fontsize=11)
-ax.set_ylabel("MAR Value", fontsize=11)
-ax.set_title("Mouth Aspect Ratio (MAR) Over Time", fontsize=13, fontweight="bold")
+ax.set_ylabel("Yawn Score", fontsize=11)
+ax.set_title("Yawn Detection Score Over Time", fontsize=13, fontweight="bold")
 ax.legend(loc="upper right")
 ax.set_xlim(0, timestamps[-1])
 plt.tight_layout()
-plt.savefig(f"{OUTPUT_DIR}/02_mar_over_time.png", dpi=150)
+plt.savefig(f"{OUTPUT_DIR}/02_yawn_score_over_time.png", dpi=150)
 plt.close()
-print("Saved: 02_mar_over_time.png")
+print("Saved: 02_yawn_score_over_time.png")
 
 # --- 3. Head Pose Over Time ---
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 6), sharex=True)
@@ -259,9 +258,9 @@ print("Saved: 04_drunk_score_over_time.png")
 # --- 5. Alert Timeline ---
 fig, ax = plt.subplots(figsize=(12, 4))
 alert_y = {"Eye Closure": 4, "Yawning": 3, "Distraction": 2, "Drunk": 1}
-alert_colors_map = {"Eye Closure": colors["ear"], "Yawning": colors["mar"],
+alert_colors_map = {"Eye Closure": colors["eye"], "Yawning": colors["yawn"],
                     "Distraction": colors["yaw"], "Drunk": "#8e44ad"}
-alert_data = {"Eye Closure": ear_closed, "Yawning": yawning, "Distraction": distracted,
+alert_data = {"Eye Closure": eyes_closed, "Yawning": yawning, "Distraction": distracted,
               "Drunk": drunk_detected}
 
 for name, y_pos in alert_y.items():
@@ -316,8 +315,8 @@ print("Saved: 06_accuracy_bar_chart.png")
 # --- 7. Confusion Matrices ---
 fig, axes = plt.subplots(1, 4, figsize=(18, 4))
 cm_data = [
-    ("Eye Closure (EAR)", gt_ear, ear_closed),
-    ("Yawning (MAR)", gt_yawn, yawning),
+    ("Eye Closure (Model)", gt_eye, eyes_closed),
+    ("Yawning (Model)", gt_yawn, yawning),
     ("Head Pose", gt_distracted, distracted),
     ("Drunk (Impairment)", gt_drunk, drunk_detected),
 ]
@@ -349,15 +348,15 @@ print("Saved: 07_confusion_matrices.png")
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
 
 # Frame classification
-n_safe = np.sum(~ear_closed & ~yawning & ~distracted & ~drunk_detected)
-n_drowsy = np.sum(ear_closed)
+n_safe = np.sum(~eyes_closed & ~yawning & ~distracted & ~drunk_detected)
+n_drowsy = np.sum(eyes_closed)
 n_yawn = np.sum(yawning)
 n_distracted_total = np.sum(distracted)
 n_drunk = np.sum(drunk_detected)
 
 labels = ["Safe", "Eyes Closed", "Yawning", "Distracted", "Drunk"]
 sizes = [n_safe, n_drowsy, n_yawn, n_distracted_total, n_drunk]
-pie_colors = [colors["safe"], colors["ear"], colors["mar"], colors["yaw"], "#8e44ad"]
+pie_colors = [colors["safe"], colors["eye"], colors["yawn"], colors["yaw"], "#8e44ad"]
 explode = (0.05, 0.05, 0.05, 0.05, 0.05)
 
 ax1.pie(sizes, explode=explode, labels=labels, colors=pie_colors, autopct="%1.1f%%",

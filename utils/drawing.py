@@ -6,7 +6,7 @@ import numpy as np
 import config
 
 
-def draw_hud(frame, ear, mar, yaw, pitch, fps, active_alerts, drunk_score=0.0):
+def draw_hud(frame, yaw, pitch, fps, active_alerts, drunk_score=0.0):
     """Draw the status dashboard on the frame."""
     h, w = frame.shape[:2]
 

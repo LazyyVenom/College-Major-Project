@@ -1,14 +1,14 @@
 """Central configuration for all thresholds and constants."""
 
-# --- Eye Aspect Ratio (Drowsiness) ---
-EAR_THRESHOLD = 0.22
-EAR_CONSECUTIVE_FRAMES = 20  # ~0.7s at 30fps
+# --- Eye State Detection (Drowsiness) ---
+EYE_SCORE_THRESHOLD = 0.22
+EYE_SCORE_CONSECUTIVE_FRAMES = 20  # ~0.7s at 30fps
 
 # MediaPipe FaceMesh eye landmark indices
 RIGHT_EYE = [33, 160, 158, 133, 153, 144]
 LEFT_EYE = [362, 385, 387, 263, 373, 380]
 
-# --- Mouth Aspect Ratio (Yawning) ---
+# --- Yawn Detection ---
 YAWN_THRESHOLD = 0.6
 YAWN_CONSECUTIVE_FRAMES = 15
 
@@ -57,14 +57,14 @@ DRUNK_RIGHT_MOUTH = 291
 DRUNK_NOSE_TIP = 1
 
 # Per-signal thresholds
-DRUNK_EAR_STD_THRESHOLD = 0.06       # EAR standard deviation
+DRUNK_EYE_STD_THRESHOLD = 0.06       # eye score standard deviation
 DRUNK_SWAY_THRESHOLD = 12.0          # head sway std (degrees)
 DRUNK_ASYMMETRY_THRESHOLD = 0.15     # facial asymmetry
 DRUNK_BLINK_STD_THRESHOLD = 8.0      # blink duration variance (frames)
 DRUNK_CLOSURE_RATIO_THRESHOLD = 0.3  # fraction of frames with eyes closed
 
 # Signal weights (sum to 1.0)
-DRUNK_WEIGHT_EAR_VAR = 0.20
+DRUNK_WEIGHT_EYE_VAR = 0.20
 DRUNK_WEIGHT_SWAY = 0.30
 DRUNK_WEIGHT_ASYMMETRY = 0.20
 DRUNK_WEIGHT_BLINK = 0.15

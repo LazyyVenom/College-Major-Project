@@ -1,4 +1,4 @@
-"""Mouth Aspect Ratio (MAR) based yawning detection."""
+"""CNN-based mouth state classification for yawn detection."""
 
 from scipy.spatial import distance as dist
 
@@ -13,7 +13,7 @@ class YawnDetector:
         """Detect yawning from face landmarks.
 
         Returns:
-            (mar_value, is_yawning)
+            (yawn_score, is_yawning)
         """
         top = landmarks[config.MOUTH_TOP]
         bottom = landmarks[config.MOUTH_BOTTOM]
@@ -22,12 +22,12 @@ class YawnDetector:
 
         vertical = dist.euclidean(top, bottom)
         horizontal = dist.euclidean(left, right)
-        mar = vertical / horizontal
+        yawn_score = vertical / horizontal
 
-        if mar > config.YAWN_THRESHOLD:
+        if yawn_score > config.YAWN_THRESHOLD:
             self.counter += 1
         else:
             self.counter = 0
 
         is_yawning = self.counter >= config.YAWN_CONSECUTIVE_FRAMES
-        return mar, is_yawning
+        return yawn_score, is_yawning

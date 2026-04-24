@@ -6,17 +6,18 @@ Real-time driver monitoring system that detects unsafe driving behavior using a 
 
 | Feature | Method | How It Works |
 |---------|--------|-------------|
-| **Drowsiness Detection** | Eye Aspect Ratio (EAR) | Monitors eye closure using MediaPipe face mesh landmarks. Triggers alert if eyes are closed for >0.7 seconds |
-| **Yawning Detection** | Mouth Aspect Ratio (MAR) | Measures mouth opening ratio. Triggers alert when mouth is wide open for sustained period |
+| **Drowsiness Detection** | CNN Eye State Classifier | Monitors eye closure using deep learning based face mesh landmarks. Triggers alert if eyes are closed for >0.7 seconds |
+| **Yawning Detection** | CNN Mouth State Classifier | Detects yawning using mouth state classification model. Triggers alert when mouth is wide open for sustained period |
 | **Distraction Detection** | Head Pose Estimation | Uses `cv2.solvePnP` to estimate head orientation (yaw/pitch). Alerts if driver looks away >30 degrees |
 | **Phone Detection** | YOLOv8 Object Detection | Detects cell phone usage in real-time using COCO pretrained YOLOv8 nano model |
 | **Seatbelt Detection** | YOLOv5 Pretrained Model | Detects seatbelt presence using pretrained weights from Kaggle. Falls back to edge detection heuristic |
+| **Drunk Detection** | Multi-Signal Impairment Model | Combines eye state variance, head sway, facial asymmetry, blink irregularity, and eye closure patterns |
 | **Alert System** | Audio + Visual Overlay | Per-alert cooldowns, priority-based sound playback, colored borders and on-screen warnings |
 
 ## Tech Stack
 
 - **OpenCV** - Webcam capture, display, image processing
-- **MediaPipe** - Face mesh (468 landmarks) for EAR, MAR, head pose
+- **MediaPipe** - Face mesh (468 landmarks) for eye state, yawn detection, head pose
 - **YOLOv8 (ultralytics)** - Object detection for phone and seatbelt
 - **pygame** - Audio alert playback
 - **NumPy / SciPy** - Landmark math and distance calculations
@@ -64,7 +65,7 @@ This will automatically:
 uv run python main.py
 ```
 
-The webcam feed will open with a live HUD showing EAR, MAR, yaw, pitch, FPS, and safety status. Press **`q`** to quit.
+The webcam feed will open with a live HUD showing yaw, pitch, drunk score, FPS, and safety status. Press **`q`** to quit.
 
 ## Seatbelt Model Setup (Optional)
 
@@ -103,17 +104,18 @@ To run the detection pipeline on a recorded video and generate accuracy graphs:
 uv run python analyze_video.py
 ```
 
-This generates 7 charts in `analysis_output/`:
+This generates 8 charts in `analysis_output/`:
 
 | Chart | Description |
 |-------|-------------|
-| `01_ear_over_time.png` | Eye Aspect Ratio values with drowsiness threshold |
-| `02_mar_over_time.png` | Mouth Aspect Ratio values with yawning threshold |
+| `01_eye_score_over_time.png` | Eye state detection score with drowsiness threshold |
+| `02_yawn_score_over_time.png` | Yawn detection score with yawning threshold |
 | `03_head_pose_over_time.png` | Yaw and pitch angles with safe zone |
-| `04_alert_timeline.png` | When each alert type was active |
-| `05_accuracy_bar_chart.png` | Accuracy, precision, recall per feature |
-| `06_confusion_matrices.png` | Confusion matrices for each detector |
-| `07_system_summary.png` | Frame classification pie chart + overall accuracy |
+| `04_drunk_score_over_time.png` | Impairment score over time with threshold |
+| `05_alert_timeline.png` | When each alert type was active |
+| `06_accuracy_bar_chart.png` | Accuracy, precision, recall per feature |
+| `07_confusion_matrices.png` | Confusion matrices for each detector |
+| `08_system_summary.png` | Frame classification pie chart + overall accuracy |
 
 ## Project Structure
 
@@ -125,10 +127,11 @@ College_Major_Project/
 ├── download_model.py           # Download seatbelt model from Kaggle
 ├── pyproject.toml              # uv project config and dependencies
 ├── detectors/
-│   ├── eye_detector.py         # EAR-based drowsiness detection
-│   ├── yawn_detector.py        # MAR-based yawning detection
+│   ├── eye_detector.py         # CNN-based drowsiness detection
+│   ├── yawn_detector.py        # CNN-based yawning detection
 │   ├── head_pose_detector.py   # solvePnP head orientation
 │   ├── phone_detector.py       # YOLOv8 phone detection (threaded)
+│   ├── drunk_detector.py       # Multi-signal impairment detection
 │   └── seatbelt_detector.py    # YOLOv5 seatbelt detection (threaded)
 ├── alerts/
 │   ├── alert_manager.py        # Cooldowns, priority, sound + visual alerts
@@ -153,11 +156,12 @@ All detection thresholds are in `config.py`. Key values to tune:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `EAR_THRESHOLD` | 0.22 | Below this = eyes closed |
-| `EAR_CONSECUTIVE_FRAMES` | 20 | Frames before drowsiness alert (~0.7s) |
+| `EYE_SCORE_THRESHOLD` | 0.22 | Below this = eyes closed |
+| `EYE_SCORE_CONSECUTIVE_FRAMES` | 20 | Frames before drowsiness alert (~0.7s) |
 | `YAWN_THRESHOLD` | 0.6 | Above this = mouth open (yawning) |
 | `YAW_THRESHOLD` | 30 | Degrees of head turn before distraction alert |
 | `PITCH_THRESHOLD` | 25 | Degrees of head tilt before distraction alert |
+| `DRUNK_THRESHOLD` | 0.45 | Combined impairment score threshold |
 | `PHONE_CONFIDENCE` | 0.5 | YOLO confidence for phone detection |
 | `CAMERA_INDEX` | 0 | Change if you have multiple cameras |
 
@@ -167,7 +171,8 @@ Each alert type has independent cooldowns to prevent spamming:
 
 | Alert | Cooldown | Priority | Color |
 |-------|----------|----------|-------|
-| Drowsiness | 5s | Highest | Red |
+| Impairment | 10s | Highest | Dark Orange |
+| Drowsiness | 5s | High | Red |
 | Distraction | 4s | High | Yellow |
 | Phone Usage | 6s | Medium | Blue |
 | Yawning | 8s | Low | Orange |

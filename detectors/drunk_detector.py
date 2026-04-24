@@ -1,7 +1,7 @@
 """Drunk/impairment detection using multi-signal facial analysis.
 
 Combines several behavioral cues over a sliding window:
-1. Eye blink irregularity (EAR variance)
+1. Eye blink irregularity (eye score variance)
 2. Facial asymmetry (left vs right side landmark distances)
 3. Head sway (low-frequency oscillation in yaw/pitch)
 4. Frequent prolonged eye closures
@@ -17,8 +17,7 @@ import config
 class DrunkDetector:
     def __init__(self):
         window = config.DRUNK_WINDOW_FRAMES
-        self.ear_history = collections.deque(maxlen=window)
-        self.mar_history = collections.deque(maxlen=window)
+        self.eye_score_history = collections.deque(maxlen=window)
         self.yaw_history = collections.deque(maxlen=window)
         self.pitch_history = collections.deque(maxlen=window)
         self.asymmetry_history = collections.deque(maxlen=window)
@@ -41,14 +40,14 @@ class DrunkDetector:
         left_v1 = dist.euclidean(left_eye[1], left_eye[5])
         left_v2 = dist.euclidean(left_eye[2], left_eye[4])
         left_h = dist.euclidean(left_eye[0], left_eye[3])
-        left_ear = (left_v1 + left_v2) / (2.0 * left_h)
+        left_score = (left_v1 + left_v2) / (2.0 * left_h)
 
         right_v1 = dist.euclidean(right_eye[1], right_eye[5])
         right_v2 = dist.euclidean(right_eye[2], right_eye[4])
         right_h = dist.euclidean(right_eye[0], right_eye[3])
-        right_ear = (right_v1 + right_v2) / (2.0 * right_h)
+        right_score = (right_v1 + right_v2) / (2.0 * right_h)
 
-        eye_asymmetry = abs(left_ear - right_ear)
+        eye_asymmetry = abs(left_score - right_score)
 
         # Left vs right mouth corner height difference
         left_mouth = landmarks[config.DRUNK_LEFT_MOUTH]
@@ -61,9 +60,9 @@ class DrunkDetector:
 
         return (eye_asymmetry + mouth_asymmetry) / 2.0
 
-    def _track_blinks(self, ear):
+    def _track_blinks(self, eye_score):
         """Track blink patterns - impaired drivers show irregular blinks."""
-        is_closed = ear < config.EAR_THRESHOLD
+        is_closed = eye_score < config.EYE_SCORE_THRESHOLD
 
         if is_closed:
             self._eye_closed_frames += 1
@@ -75,12 +74,12 @@ class DrunkDetector:
 
         self._was_closed = is_closed
 
-    def detect(self, landmarks, ear, yaw, pitch):
+    def detect(self, landmarks, eye_score, yaw, pitch):
         """Detect signs of impairment from facial metrics.
 
         Args:
             landmarks: MediaPipe face landmarks array.
-            ear: Current Eye Aspect Ratio from EyeDetector.
+            eye_score: Current eye state score from EyeDetector.
             yaw: Current head yaw from HeadPoseDetector.
             pitch: Current head pitch from HeadPoseDetector.
 
@@ -88,26 +87,26 @@ class DrunkDetector:
             (drunk_score, is_drunk): Score 0-1 and boolean flag.
         """
         # Collect signals
-        self.ear_history.append(ear)
+        self.eye_score_history.append(eye_score)
         self.yaw_history.append(yaw)
         self.pitch_history.append(pitch)
 
         asymmetry = self._facial_asymmetry(landmarks)
         self.asymmetry_history.append(asymmetry)
 
-        self._track_blinks(ear)
+        self._track_blinks(eye_score)
 
         # Need enough data before scoring
-        if len(self.ear_history) < config.DRUNK_MIN_FRAMES:
+        if len(self.eye_score_history) < config.DRUNK_MIN_FRAMES:
             return 0.0, False
 
         scores = []
 
-        # Signal 1: EAR variance (unstable eye opening = impairment)
-        ear_arr = np.array(self.ear_history)
-        ear_std = np.std(ear_arr)
-        ear_var_score = min(ear_std / config.DRUNK_EAR_STD_THRESHOLD, 1.0)
-        scores.append(ear_var_score * config.DRUNK_WEIGHT_EAR_VAR)
+        # Signal 1: Eye score variance (unstable eye opening = impairment)
+        eye_arr = np.array(self.eye_score_history)
+        eye_std = np.std(eye_arr)
+        eye_var_score = min(eye_std / config.DRUNK_EYE_STD_THRESHOLD, 1.0)
+        scores.append(eye_var_score * config.DRUNK_WEIGHT_EYE_VAR)
 
         # Signal 2: Head sway (slow oscillation in yaw/pitch)
         yaw_arr = np.array(self.yaw_history)
@@ -133,12 +132,12 @@ class DrunkDetector:
         scores.append(blink_score * config.DRUNK_WEIGHT_BLINK)
 
         # Signal 5: Prolonged eye closure ratio
-        closure_ratio = np.sum(ear_arr < config.EAR_THRESHOLD) / len(ear_arr)
+        closure_ratio = np.sum(eye_arr < config.EYE_SCORE_THRESHOLD) / len(eye_arr)
         closure_score = min(closure_ratio / config.DRUNK_CLOSURE_RATIO_THRESHOLD, 1.0)
         scores.append(closure_score * config.DRUNK_WEIGHT_CLOSURE)
 
         # Combined weighted score
-        total_weight = (config.DRUNK_WEIGHT_EAR_VAR + config.DRUNK_WEIGHT_SWAY +
+        total_weight = (config.DRUNK_WEIGHT_EYE_VAR + config.DRUNK_WEIGHT_SWAY +
                         config.DRUNK_WEIGHT_ASYMMETRY + config.DRUNK_WEIGHT_BLINK +
                         config.DRUNK_WEIGHT_CLOSURE)
         drunk_score = sum(scores) / total_weight
